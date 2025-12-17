@@ -1,5 +1,4 @@
-﻿@implements IDisposable
-
+﻿@@implements IDisposable
 @inject NavigationManager NavigationManager
 
 <div class="top-row ps-3 navbar navbar-dark">
@@ -21,17 +20,8 @@
             </NavLink>
         </div>
 
-        <!-- AUTH REQUIRED SAMPLE -->
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="auth">
-                <span class="bi bi-lock-nav-menu" aria-hidden="true"></span>
-                Auth Required
-            </NavLink>
-        </div>
-
         <AuthorizeView Context="authContext">
             <Authorized>
-
                 <!-- USER NAME -->
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="Account/Manage">
@@ -44,22 +34,37 @@
                 <AuthorizeView Roles="Customer" Context="customerContext">
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="customer/book">
-                            📅 Book Appointment
+                            <span class="bi bi-calendar-plus"></span> Book Appointment
                         </NavLink>
                     </div>
 
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="customer/appointments">
-                            📋 My Appointments
+                            <span class="bi bi-list-check"></span> My Appointments
                         </NavLink>
                     </div>
                 </AuthorizeView>
 
-                <!-- ADMIN / PROVIDER LINKS -->
-                <AuthorizeView Roles="SpaAdmin,ServiceProvider" Context="adminContext">
+                <!-- ADMIN LINKS (SpaAdmin only) -->
+                <AuthorizeView Roles="SpaAdmin" Context="adminContext">
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="admin/appointments">
-                            📋 Manage Appointments
+                            <span class="bi bi-clipboard-data"></span> Manage All Appointments
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="admin/assign-appointments">
+                            <span class="bi bi-person-check"></span> Assign Appointments
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+
+                <!-- SERVICE PROVIDER LINKS -->
+                <AuthorizeView Roles="ServiceProvider" Context="providerContext">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="employee/appointments">
+                            <span class="bi bi-person-badge"></span> My Assigned Appointments
                         </NavLink>
                     </div>
                 </AuthorizeView>
@@ -81,18 +86,17 @@
             <NotAuthorized>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="Account/Register">
-                        Register
+                        <span class="bi bi-person-plus"></span> Register
                     </NavLink>
                 </div>
 
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="Account/Login">
-                        Login
+                        <span class="bi bi-box-arrow-in-right"></span> Login
                     </NavLink>
                 </div>
             </NotAuthorized>
         </AuthorizeView>
-
 
     </nav>
 </div>

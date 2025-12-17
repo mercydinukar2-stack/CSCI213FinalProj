@@ -1,0 +1,87 @@
+﻿@page "/employee/appointments"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "ServiceProvider")]
+@using StudSpa.Models
+@using StudSpa.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject ApplicationDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3>My Assigned Appointments</h3>
+<hr />
+
+@if (appointments == null)
+{
+    <p>Loading appointments...</p>
+}
+else if (!appointments.Any())
+{
+    <p>You have no assigned appointments.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Customer</th>
+                <th>Service</th>
+                <th>Date & Time</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var appt in appointments)
+            {
+                <tr>
+                    <td>@appt.CustomerId</td>
+                    <td>@appt.Service.Name</td>
+                    <td>@appt.AppointmentDate.ToString("g")</td>
+                    <td>
+                        <span class="badge @GetStatusBadge(appt.Status)">
+                            @appt.Status
+                        </span>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Appointment>? appointments;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAppointments();
+    }
+
+    private async Task LoadAppointments()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+
+        if (user == null)
+            return;
+
+        appointments = await Db.Appointments
+            .Include(a => a.Service)
+            .Where(a => a.EmployeeId == user.Id)
+            .OrderBy(a => a.AppointmentDate)
+            .ToListAsync();
+    }
+
+    private string GetStatusBadge(AppointmentStatus status) => status switch
+    {
+        AppointmentStatus.Scheduled => "bg-primary",
+        AppointmentStatus.Confirmed => "bg-info",
+        AppointmentStatus.Completed => "bg-success",
+        AppointmentStatus.Cancelled => "bg-secondary",
+        AppointmentStatus.NoShow => "bg-warning",
+        _ => "bg-dark"
+    };
+}
+

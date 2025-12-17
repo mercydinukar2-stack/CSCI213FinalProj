@@ -1,0 +1,145 @@
+﻿@page "/admin/assign-appointments"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "SpaAdmin")]
+@using StudSpa.Models
+@using StudSpa.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+@inject ApplicationDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+
+<h3>Assign Appointments to Employees</h3>
+<hr />
+
+@if (appointments == null || employees == null)
+{
+    <p>Loading...</p>
+}
+else if (!appointments.Any())
+{
+    <p>No appointments available to assign.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Customer</th>
+                <th>Service</th>
+                <th>Date & Time</th>
+                <th>Status</th>
+                <th>Assigned To</th>
+                <th>Assign Employee</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var appt in appointments)
+            {
+                <tr>
+                    <td>@appt.CustomerId</td>
+                    <td>@appt.Service.Name</td>
+                    <td>@appt.AppointmentDate.ToString("g")</td>
+                    <td>
+                        <span class="badge @GetStatusBadge(appt.Status)">
+                            @appt.Status
+                        </span>
+                    </td>
+                    <td>
+                        @if (appt.Employee != null)
+                        {
+                            <span class="text-success">
+                                <strong>@appt.Employee.Email</strong>
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Unassigned</span>
+                        }
+                    </td>
+                    <td>
+                        <select class="form-select form-select-sm"
+                                value="@(appt.EmployeeId ?? "")"
+                                @onchange="e => AssignEmployee(appt.Id, e.Value!.ToString())">
+                            <option value="">-- Select Employee --</option>
+                            @foreach (var emp in employees)
+                            {
+                                <option value="@emp.Id">
+                                    @emp.Email
+                                </option>
+                            }
+                        </select>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success mt-3">@successMessage</div>
+}
+
+@code {
+    private List<Appointment>? appointments;
+    private List<ApplicationUser>? employees;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        appointments = await Db.Appointments
+            .Include(a => a.Service)
+            .Include(a => a.Employee)
+            .Where(a => a.Status != AppointmentStatus.Cancelled &&
+                        a.Status != AppointmentStatus.Completed)
+            .OrderBy(a => a.AppointmentDate)
+            .ToListAsync();
+
+        employees = (await UserManager.GetUsersInRoleAsync("ServiceProvider")).ToList();
+    }
+
+    private async Task AssignEmployee(int appointmentId, string? employeeId)
+    {
+        successMessage = null;
+
+        var appt = await Db.Appointments.FindAsync(appointmentId);
+        if (appt == null)
+            return;
+
+        if (string.IsNullOrEmpty(employeeId))
+        {
+            // Unassign
+            appt.EmployeeId = null;
+            await Db.SaveChangesAsync();
+            successMessage = "Employee unassigned successfully.";
+        }
+        else
+        {
+            // Assign
+            appt.EmployeeId = employeeId;
+            await Db.SaveChangesAsync();
+
+            var employee = await UserManager.FindByIdAsync(employeeId);
+            successMessage = $"Assigned to {employee?.Email} successfully.";
+        }
+
+        await LoadData();
+    }
+
+    private string GetStatusBadge(AppointmentStatus status) => status switch
+    {
+        AppointmentStatus.Scheduled => "bg-primary",
+        AppointmentStatus.Confirmed => "bg-info",
+        AppointmentStatus.Completed => "bg-success",
+        AppointmentStatus.Cancelled => "bg-secondary",
+        AppointmentStatus.NoShow => "bg-warning",
+        _ => "bg-dark"
+    };
+}
+

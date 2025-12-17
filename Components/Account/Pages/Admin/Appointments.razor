@@ -1,6 +1,6 @@
 ﻿@page "/admin/appointments"
-@attribute [Authorize(Roles = "SpaAdmin,ServiceProvider")]
-
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "SpaAdmin")]
 @using StudSpa.Models
 @using StudSpa.Data
 @using Microsoft.EntityFrameworkCore
@@ -8,12 +8,16 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject ApplicationDbContext Db
 
-<h3>All Appointments</h3>
+<h3>All Appointments (Admin)</h3>
 <hr />
 
 @if (appointments == null)
 {
     <p>Loading appointments...</p>
+}
+else if (!appointments.Any())
+{
+    <p>No appointments found.</p>
 }
 else
 {
@@ -34,22 +38,33 @@ else
                     <td>@appt.CustomerId</td>
                     <td>@appt.Service.Name</td>
                     <td>@appt.AppointmentDate.ToString("g")</td>
-                    <td>@appt.Status</td>
                     <td>
-                        <button class="btn btn-sm btn-success me-1"
-                                @onclick="() => UpdateStatus(appt.Id, AppointmentStatus.Confirmed)">
-                            Confirm
-                        </button>
-
-                        <button class="btn btn-sm btn-primary me-1"
-                                @onclick="() => UpdateStatus(appt.Id, AppointmentStatus.Completed)">
-                            Complete
-                        </button>
-
-                        <button class="btn btn-sm btn-danger"
-                                @onclick="() => UpdateStatus(appt.Id, AppointmentStatus.Cancelled)">
-                            Cancel
-                        </button>
+                        <span class="badge @GetStatusBadge(appt.Status)">
+                            @appt.Status
+                        </span>
+                    </td>
+                    <td>
+                        @if (appt.Status == AppointmentStatus.Scheduled)
+                        {
+                            <button class="btn btn-sm btn-success me-1"
+                                    @onclick="() => UpdateStatus(appt.Id, AppointmentStatus.Confirmed)">
+                                Confirm
+                            </button>
+                        }
+                        @if (appt.Status == AppointmentStatus.Confirmed)
+                        {
+                            <button class="btn btn-sm btn-primary me-1"
+                                    @onclick="() => UpdateStatus(appt.Id, AppointmentStatus.Completed)">
+                                Complete
+                            </button>
+                        }
+                        @if (appt.Status != AppointmentStatus.Cancelled && appt.Status != AppointmentStatus.Completed)
+                        {
+                            <button class="btn btn-sm btn-danger"
+                                    @onclick="() => UpdateStatus(appt.Id, AppointmentStatus.Cancelled)">
+                                Cancel
+                            </button>
+                        }
                     </td>
                 </tr>
             }
@@ -62,9 +77,14 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadAppointments();
+    }
+
+    private async Task LoadAppointments()
+    {
         appointments = await Db.Appointments
             .Include(a => a.Service)
-            .OrderBy(a => a.AppointmentDate)
+            .OrderByDescending(a => a.AppointmentDate)
             .ToListAsync();
     }
 
@@ -77,11 +97,16 @@ else
         appt.Status = status;
         await Db.SaveChangesAsync();
 
-        // refresh list
-        appointments = await Db.Appointments
-            .Include(a => a.Service)
-            .OrderBy(a => a.AppointmentDate)
-            .ToListAsync();
+        await LoadAppointments();
     }
-}
 
+    private string GetStatusBadge(AppointmentStatus status) => status switch
+    {
+        AppointmentStatus.Scheduled => "bg-primary",
+        AppointmentStatus.Confirmed => "bg-info",
+        AppointmentStatus.Completed => "bg-success",
+        AppointmentStatus.Cancelled => "bg-secondary",
+        AppointmentStatus.NoShow => "bg-warning",
+        _ => "bg-dark"
+    };
+}
