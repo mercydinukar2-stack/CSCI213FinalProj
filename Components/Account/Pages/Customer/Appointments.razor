@@ -1,0 +1,125 @@
+﻿@page "/customer/appointments"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Customer")]
+@using System.Threading.Tasks
+@using StudSpa.Models
+@using StudSpa.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@inject ApplicationDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3>My Appointments</h3>
+<hr />
+
+@if (appointments == null)
+{
+    <p>Loading appointments...</p>
+}
+else if (!appointments.Any())
+{
+    <p>You have no appointments.</p>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Service</th>
+                <th>Date & Time</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var appt in appointments)
+            {
+                <tr>
+                    <td>@appt.Service.Name</td>
+                    <td>@appt.AppointmentDate.ToString("f")</td>
+                    <td>
+                        <span class="badge @GetStatusBadge(appt.Status)">
+                            @appt.Status
+                        </span>
+                    </td>
+                    <td>
+                        @if (CanCancel(appt))
+                        {
+                            <button class="btn btn-sm btn-danger"
+                                    @onclick="() => CancelAppointment(appt.Id)">
+                                Cancel
+                            </button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Appointment>? appointments;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAppointments();
+    }
+
+    private async Task LoadAppointments()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+
+        if (user == null)
+            return;
+
+        appointments = await Db.Appointments
+            .Include(a => a.Service)
+            .Where(a => a.CustomerId == user.Id)
+            .OrderByDescending(a => a.AppointmentDate)
+            .ToListAsync();
+    }
+
+    private bool CanCancel(Appointment appt)
+    {
+        return (appt.Status == AppointmentStatus.Scheduled
+             || appt.Status == AppointmentStatus.Confirmed)
+             && appt.AppointmentDate > DateTime.Now;
+    }
+
+    private async Task CancelAppointment(int appointmentId)
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+
+        if (user == null)
+            return;
+
+        var appointment = await Db.Appointments
+            .FirstOrDefaultAsync(a =>
+                a.Id == appointmentId &&
+                a.CustomerId == user.Id);
+
+        if (appointment == null)
+            return;
+
+        appointment.Status = AppointmentStatus.Cancelled;
+        await Db.SaveChangesAsync();
+
+        await LoadAppointments(); // refresh table
+    }
+
+    private string GetStatusBadge(AppointmentStatus status) => status switch
+    {
+        AppointmentStatus.Scheduled => "bg-primary",
+        AppointmentStatus.Confirmed => "bg-info",
+        AppointmentStatus.Completed => "bg-success",
+        AppointmentStatus.Cancelled => "bg-secondary",
+        AppointmentStatus.NoShow => "bg-warning",
+        _ => "bg-dark"
+    };
+}

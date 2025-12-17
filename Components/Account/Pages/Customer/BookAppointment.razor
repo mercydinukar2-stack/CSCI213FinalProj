@@ -1,0 +1,179 @@
+﻿@page "/customer/book"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Customer")]
+@using StudSpa.Models
+@using StudSpa.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using System.ComponentModel.DataAnnotations
+@inject ApplicationDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3>Book an Appointment</h3>
+<hr />
+
+<EditForm Model="form" OnSubmit="HandleBooking">
+
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+
+    <!-- SERVICE -->
+    <div class="mb-3">
+        <label class="form-label">Service</label>
+        <select class="form-select" @bind="form.ServiceId">
+            <option value="0">-- Select a Service --</option>
+            @foreach (var service in services)
+            {
+                <option value="@service.Id">
+                    @service.Name (@service.DurationMinutes min - $@service.Price)
+                </option>
+            }
+        </select>
+    </div>
+
+    <!-- DATE -->
+    <div class="mb-3">
+        <label class="form-label">Date</label>
+        <InputDate Type="InputDateType.Date"
+                   class="form-control"
+                   @bind-Value="form.AppointmentDate" />
+    </div>
+
+    <!-- TIME -->
+    <div class="mb-3">
+        <label class="form-label">Time</label>
+        <InputDate Type="InputDateType.Time"
+                   class="form-control"
+                   @bind-Value="form.AppointmentTime" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">
+        Book Appointment
+    </button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-success mt-3">@message</div>
+}
+
+@code {
+    private AppointmentFormModel form = new();
+    private List<Service> services = new();
+    private string? message;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        services = await Db.Services
+            .Where(s => s.IsActive)
+            .ToListAsync();
+
+        // Set default date to today and time to 9 AM
+        form.AppointmentDate = DateTime.Today;
+        form.AppointmentTime = DateTime.Today.AddHours(9);
+    }
+
+    private async Task HandleBooking()
+    {
+        error = null;
+        message = null;
+
+        // Validate service
+        if (form.ServiceId == 0)
+        {
+            error = "Please select a service.";
+            return;
+        }
+
+        // Validate date
+        if (form.AppointmentDate == default)
+        {
+            error = "Please select a valid date.";
+            return;
+        }
+
+        // Validate time
+        if (form.AppointmentTime == default)
+        {
+            error = "Please select a valid time.";
+            return;
+        }
+
+        // Combine date and time
+        var appointmentDateTime = form.AppointmentDate.Date
+            .AddHours(form.AppointmentTime.Hour)
+            .AddMinutes(form.AppointmentTime.Minute);
+
+        // Validate appointment is in the future
+        if (appointmentDateTime < DateTime.Now)
+        {
+            error = "You cannot book an appointment in the past.";
+            return;
+        }
+
+        // Validate business hours (9 AM to 5 PM)
+        if (appointmentDateTime.Hour < 9 || appointmentDateTime.Hour >= 17)
+        {
+            error = "Appointments must be between 9 AM and 5 PM.";
+            return;
+        }
+
+        // Get current user
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+
+        if (user == null)
+        {
+            error = "User not found.";
+            return;
+        }
+
+        // Check if time slot is available
+        bool slotTaken = await Db.Appointments.AnyAsync(a =>
+            a.AppointmentDate == appointmentDateTime &&
+            a.Status != AppointmentStatus.Cancelled
+        );
+
+        if (slotTaken)
+        {
+            error = "This time slot is already booked. Please select another time.";
+            return;
+        }
+
+        // Create appointment
+        var appointment = new Appointment
+        {
+            CustomerId = user.Id,
+            ServiceId = form.ServiceId,
+            AppointmentDate = appointmentDateTime,
+            Status = AppointmentStatus.Scheduled,
+            CreatedAt = DateTime.Now
+        };
+
+        Db.Appointments.Add(appointment);
+        await Db.SaveChangesAsync();
+
+        message = "Appointment booked successfully!";
+
+        // Reset form
+        form = new AppointmentFormModel
+        {
+            AppointmentDate = DateTime.Today,
+            AppointmentTime = DateTime.Today.AddHours(9)
+        };
+    }
+
+    private class AppointmentFormModel
+    {
+        public int ServiceId { get; set; }
+        public DateTime AppointmentDate { get; set; } = DateTime.Today;
+        public DateTime AppointmentTime { get; set; } = DateTime.Today.AddHours(9);
+    }
+}

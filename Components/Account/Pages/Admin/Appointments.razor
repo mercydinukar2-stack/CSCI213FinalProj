@@ -1,0 +1,87 @@
+﻿@page "/admin/appointments"
+@attribute [Authorize(Roles = "SpaAdmin,ServiceProvider")]
+
+@using StudSpa.Models
+@using StudSpa.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject ApplicationDbContext Db
+
+<h3>All Appointments</h3>
+<hr />
+
+@if (appointments == null)
+{
+    <p>Loading appointments...</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Customer</th>
+                <th>Service</th>
+                <th>Date & Time</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var appt in appointments)
+            {
+                <tr>
+                    <td>@appt.CustomerId</td>
+                    <td>@appt.Service.Name</td>
+                    <td>@appt.AppointmentDate.ToString("g")</td>
+                    <td>@appt.Status</td>
+                    <td>
+                        <button class="btn btn-sm btn-success me-1"
+                                @onclick="() => UpdateStatus(appt.Id, AppointmentStatus.Confirmed)">
+                            Confirm
+                        </button>
+
+                        <button class="btn btn-sm btn-primary me-1"
+                                @onclick="() => UpdateStatus(appt.Id, AppointmentStatus.Completed)">
+                            Complete
+                        </button>
+
+                        <button class="btn btn-sm btn-danger"
+                                @onclick="() => UpdateStatus(appt.Id, AppointmentStatus.Cancelled)">
+                            Cancel
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Appointment>? appointments;
+
+    protected override async Task OnInitializedAsync()
+    {
+        appointments = await Db.Appointments
+            .Include(a => a.Service)
+            .OrderBy(a => a.AppointmentDate)
+            .ToListAsync();
+    }
+
+    private async Task UpdateStatus(int appointmentId, AppointmentStatus status)
+    {
+        var appt = await Db.Appointments.FindAsync(appointmentId);
+        if (appt == null)
+            return;
+
+        appt.Status = status;
+        await Db.SaveChangesAsync();
+
+        // refresh list
+        appointments = await Db.Appointments
+            .Include(a => a.Service)
+            .OrderBy(a => a.AppointmentDate)
+            .ToListAsync();
+    }
+}
+
