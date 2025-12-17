@@ -11,19 +11,26 @@ namespace StudSpa.Models
         [Required]
         public DateTime AppointmentDate { get; set; }
 
+        // CUSTOMER
         [Required]
         public string CustomerId { get; set; } = string.Empty;
 
+        // SERVICE
         [Required]
         public int ServiceId { get; set; }
-
         public Service Service { get; set; } = null!;
 
-        public AppointmentStatus Status { get; set; } = AppointmentStatus.Scheduled;
+        // 🔹 EMPLOYEE (SERVICE PROVIDER)
+        public string? EmployeeId { get; set; }
 
+        [ForeignKey(nameof(EmployeeId))]
+        public ApplicationUser? Employee { get; set; }
+
+        public AppointmentStatus Status { get; set; } = AppointmentStatus.Scheduled;
         public DateTime CreatedAt { get; set; } = DateTime.Now;
     }
-
 }
+
+
 
 
