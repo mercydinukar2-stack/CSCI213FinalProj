@@ -1,4 +1,4 @@
-﻿@@implements IDisposable
+﻿@implements IDisposable
 @inject NavigationManager NavigationManager
 
 <div class="top-row ps-3 navbar navbar-dark">
@@ -17,6 +17,20 @@
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
                 <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span>
                 Home
+            </NavLink>
+        </div>
+
+        <!-- SERVICES (PUBLIC) -->
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="services">
+                <span class="bi bi-briefcase-fill"></span> Services
+            </NavLink>
+        </div>
+
+        <!-- REVIEWS (PUBLIC) -->
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="reviews">
+                <span class="bi bi-star-fill"></span> Reviews
             </NavLink>
         </div>
 
@@ -44,7 +58,6 @@
                         </NavLink>
                     </div>
                 </AuthorizeView>
-
                 <!-- ADMIN LINKS (SpaAdmin only) -->
                 <AuthorizeView Roles="SpaAdmin" Context="adminContext">
                     <div class="nav-item px-3">
@@ -56,6 +69,18 @@
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="admin/assign-appointments">
                             <span class="bi bi-person-check"></span> Assign Appointments
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="admin/employees">
+                            <span class="bi bi-people-fill"></span> Manage Employees
+                        </NavLink>
+                    </div>
+
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="admin/reviews">
+                            <span class="bi bi-chat-quote-fill"></span> Manage Reviews
                         </NavLink>
                     </div>
                 </AuthorizeView>

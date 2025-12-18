@@ -1,0 +1,129 @@
+﻿@page "/reviews"
+@using StudSpa.Models
+@using StudSpa.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<h3>Customer Reviews</h3>
+<hr />
+
+@if (reviews == null)
+{
+    <p>Loading reviews...</p>
+}
+else if (!reviews.Any())
+{
+    <p>No reviews yet. Be the first to leave a review!</p>
+}
+else
+{
+    <div class="mb-4">
+        <h5>Overall Statistics</h5>
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <h2 class="text-warning">@overallRating.ToString("F1") ⭐</h2>
+                        <p class="text-muted">Average Rating</p>
+                    </div>
+                    <div class="col-md-3">
+                        <h2>@reviews.Count</h2>
+                        <p class="text-muted">Total Reviews</p>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-1">
+                            <span class="me-2">5 ⭐</span>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar bg-warning" style="width: @GetPercentage(5)%">@reviews.Count(r => r.Rating == 5)</div>
+                            </div>
+                        </div>
+                        <div class="mb-1">
+                            <span class="me-2">4 ⭐</span>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar bg-warning" style="width: @GetPercentage(4)%">@reviews.Count(r => r.Rating == 4)</div>
+                            </div>
+                        </div>
+                        <div class="mb-1">
+                            <span class="me-2">3 ⭐</span>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar bg-warning" style="width: @GetPercentage(3)%">@reviews.Count(r => r.Rating == 3)</div>
+                            </div>
+                        </div>
+                        <div class="mb-1">
+                            <span class="me-2">2 ⭐</span>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar bg-warning" style="width: @GetPercentage(2)%">@reviews.Count(r => r.Rating == 2)</div>
+                            </div>
+                        </div>
+                        <div class="mb-1">
+                            <span class="me-2">1 ⭐</span>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar bg-warning" style="width: @GetPercentage(1)%">@reviews.Count(r => r.Rating == 1)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h5>Recent Reviews</h5>
+    <div class="row">
+        @foreach (var review in reviews)
+        {
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="card-subtitle mb-1">@review.Service.Name</h6>
+                                <div>
+                                    @for (int i = 1; i <= 5; i++)
+                                    {
+                                        if (i <= review.Rating)
+                                        {
+                                            <span class="text-warning">⭐</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">☆</span>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                            <small class="text-muted">@review.CreatedAt.ToString("MMM d, yyyy")</small>
+                        </div>
+                        @if (!string.IsNullOrEmpty(review.Comment))
+                        {
+                            <p class="card-text">@review.Comment</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Review>? reviews;
+    private double overallRating;
+
+    protected override async Task OnInitializedAsync()
+    {
+        reviews = await Db.Reviews
+            .Include(r => r.Service)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+
+        if (reviews != null && reviews.Any())
+        {
+            overallRating = reviews.Average(r => r.Rating);
+        }
+    }
+
+    private double GetPercentage(int rating)
+    {
+        if (reviews == null || !reviews.Any()) return 0;
+        return (double)reviews.Count(r => r.Rating == rating) / reviews.Count * 100;
+    }
+}

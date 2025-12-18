@@ -1,0 +1,138 @@
+﻿@page "/customer/review/{AppointmentId:int}"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Customer")]
+@using StudSpa.Models
+@using StudSpa.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+@inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager Nav
+
+<h3>Leave a Review</h3>
+<hr />
+
+@if (isLoading)
+{
+    <p>Loading...</p>
+}
+else if (appointment == null)
+{
+    <div class="alert alert-warning">
+        This appointment cannot be reviewed.
+    </div>
+}
+else if (alreadyReviewed)
+{
+    <div class="alert alert-info">
+        You have already reviewed this appointment.
+    </div>
+}
+else
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">@appointment.Service.Name</h5>
+            <p class="card-text">
+                <strong>Date:</strong> @appointment.AppointmentDate.ToString("f")
+            </p>
+        </div>
+    </div>
+
+    <EditForm Model="model" OnValidSubmit="SubmitReview">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="text-danger" />
+
+        <div class="mb-3">
+            <label class="form-label">Rating</label>
+            <select class="form-select" @bind="model.Rating">
+                <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+                <option value="4">⭐⭐⭐⭐ Good</option>
+                <option value="3">⭐⭐⭐ Average</option>
+                <option value="2">⭐⭐ Poor</option>
+                <option value="1">⭐ Very Poor</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Comment (Optional)</label>
+            <textarea class="form-control"
+                      @bind="model.Comment"
+                      rows="4"
+                      placeholder="Share your experience..."></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-success">
+            Submit Review
+        </button>
+        <a href="/customer/appointments" class="btn btn-secondary">
+            Cancel
+        </a>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int AppointmentId { get; set; }
+
+    private Appointment? appointment;
+    private bool alreadyReviewed;
+    private bool isLoading = true;
+    private ReviewFormModel model = new() { Rating = 5 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+
+        if (user == null)
+        {
+            Nav.NavigateTo("/Account/Login");
+            return;
+        }
+
+        appointment = await Db.Appointments
+            .Include(a => a.Service)
+            .FirstOrDefaultAsync(a =>
+                a.Id == AppointmentId &&
+                a.CustomerId == user.Id &&
+                a.Status == AppointmentStatus.Completed);
+
+        if (appointment != null)
+        {
+            alreadyReviewed = await Db.Reviews
+                .AnyAsync(r => r.AppointmentId == AppointmentId);
+        }
+
+        isLoading = false;
+    }
+
+    private async Task SubmitReview()
+    {
+        if (appointment == null)
+            return;
+
+        var review = new StudSpa.Models.Review
+        {
+            CustomerId = appointment.CustomerId,
+            ServiceId = appointment.ServiceId,
+            AppointmentId = appointment.Id,
+            Rating = model.Rating,
+            Comment = model.Comment,
+            CreatedAt = DateTime.Now
+        };
+
+        Db.Reviews.Add(review);
+        await Db.SaveChangesAsync();
+
+        Nav.NavigateTo("/customer/appointments");
+    }
+
+    private class ReviewFormModel
+    {
+        public int Rating { get; set; } = 5;
+        public string? Comment { get; set; }
+    }
+}

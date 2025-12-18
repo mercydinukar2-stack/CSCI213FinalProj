@@ -49,12 +49,21 @@ else
                     <td>
                         @if (CanCancel(appt))
                         {
-                            <button class="btn btn-sm btn-danger"
+                            <button class="btn btn-sm btn-danger me-1"
                                     @onclick="() => CancelAppointment(appt.Id)">
                                 Cancel
                             </button>
                         }
+
+                        @if (appt.Status == AppointmentStatus.Completed)
+                        {
+                            <NavLink class="btn btn-sm btn-outline-warning"
+                                     href="@($"/customer/review/{appt.Id}")">
+                                ⭐ Leave Review
+                            </NavLink>
+                        }
                     </td>
+
                 </tr>
             }
         </tbody>
