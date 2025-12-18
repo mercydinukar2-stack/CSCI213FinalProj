@@ -1,0 +1,75 @@
+﻿@page "/admin/reviews"
+@attribute [Authorize(Roles = "SpaAdmin")]
+@using StudSpa.Models
+@using StudSpa.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+
+@inject ApplicationDbContext Db
+
+<h3>Manage Reviews</h3>
+<hr />
+
+@if (reviews == null)
+{
+    <p>Loading reviews...</p>
+}
+else if (!reviews.Any())
+{
+    <p>No reviews found.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Service</th>
+                <th>Rating</th>
+                <th>Comment</th>
+                <th>Date</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in reviews)
+            {
+                <tr>
+                    <td>@r.Service.Name</td>
+                    <td>@r.Rating ⭐</td>
+                    <td>@r.Comment</td>
+                    <td>@r.CreatedAt.ToShortDateString()</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger"
+                                @onclick="() => DeleteReview(r.Id)">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Review>? reviews;
+
+    protected override async Task OnInitializedAsync()
+    {
+        reviews = await Db.Reviews
+            .Include(r => r.Service)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+    }
+
+    private async Task DeleteReview(int id)
+    {
+        var review = await Db.Reviews.FindAsync(id);
+        if (review == null) return;
+
+        Db.Reviews.Remove(review);
+        await Db.SaveChangesAsync();
+
+        reviews = reviews!.Where(r => r.Id != id).ToList();
+    }
+}
+
