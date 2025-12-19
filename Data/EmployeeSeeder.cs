@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Identity;
-using StudSpa.Models;
+using StudSpa.Data;
 
 namespace StudSpa.Data
 {
@@ -10,8 +10,6 @@ namespace StudSpa.Data
             var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
             var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
 
-            const string employeeEmail = "employee@studspa.com";
-            const string employeePassword = "Employee123!";
             const string employeeRole = "ServiceProvider";
 
             // Ensure role exists
@@ -20,26 +18,37 @@ namespace StudSpa.Data
                 await roleManager.CreateAsync(new IdentityRole(employeeRole));
             }
 
-            // Ensure employee user exists
-            var employeeUser = await userManager.FindByEmailAsync(employeeEmail);
-            if (employeeUser == null)
+            // List of employees to seed
+            var employees = new[]
             {
-                employeeUser = new ApplicationUser
+                new { Email = "sara@studspa.com", Password = "Employee123!", FirstName = "Sarah", LastName = "Johnson" },
+                new { Email = "michael@studspa.com", Password = "Employee123!", FirstName = "Michael", LastName = "Chen" },
+                new { Email = "jessica@studspa.com", Password = "Employee123!", FirstName = "Jessica", LastName = "Martinez" },
+                new { Email = "david@studspa.com", Password = "Employee123!", FirstName = "David", LastName = "Williams" }
+            };
+
+            foreach (var emp in employees)
+            {
+                var employeeUser = await userManager.FindByEmailAsync(emp.Email);
+                if (employeeUser == null)
                 {
-                    UserName = employeeEmail,
-                    Email = employeeEmail,
-                    EmailConfirmed = true
-                };
+                    employeeUser = new ApplicationUser
+                    {
+                        UserName = emp.Email,
+                        Email = emp.Email,
+                        EmailConfirmed = true
+                    };
 
-                var result = await userManager.CreateAsync(employeeUser, employeePassword);
-                if (!result.Succeeded)
-                    throw new Exception("Failed to create employee user");
-            }
+                    var result = await userManager.CreateAsync(employeeUser, emp.Password);
+                    if (!result.Succeeded)
+                        throw new Exception($"Failed to create employee user {emp.Email}");
+                }
 
-            // Assign role
-            if (!await userManager.IsInRoleAsync(employeeUser, employeeRole))
-            {
-                await userManager.AddToRoleAsync(employeeUser, employeeRole);
+                // Assign role
+                if (!await userManager.IsInRoleAsync(employeeUser, employeeRole))
+                {
+                    await userManager.AddToRoleAsync(employeeUser, employeeRole);
+                }
             }
         }
     }

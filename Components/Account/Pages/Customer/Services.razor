@@ -1,0 +1,50 @@
+﻿@page "/services"
+@using StudSpa.Models
+@using StudSpa.Data
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<h3>Our Services</h3>
+<hr />
+
+@if (services == null)
+{
+    <p>Loading services...</p>
+}
+else if (!services.Any())
+{
+    <p>No services available at this time.</p>
+}
+else
+{
+    <div class="row">
+        @foreach (var service in services)
+        {
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">@service.Name</h5>
+                        <p class="card-text">@service.Description</p>
+                        <ul class="list-unstyled">
+                            <li><strong>Duration:</strong> @service.DurationMinutes minutes</li>
+                            <li><strong>Price:</strong> $@service.Price</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Service>? services;
+
+    protected override async Task OnInitializedAsync()
+    {
+        services = await Db.Services
+            .Where(s => s.IsActive)
+            .OrderBy(s => s.Name)
+            .ToListAsync();
+    }
+}
+

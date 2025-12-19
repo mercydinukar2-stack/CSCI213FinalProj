@@ -1,0 +1,226 @@
+﻿@page "/admin/employees"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "SpaAdmin")]
+@using StudSpa.Data
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+
+<h3>Manage Employees</h3>
+<hr />
+
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick="ShowAddForm">
+        <span class="bi bi-plus-circle"></span> Add New Employee
+    </button>
+</div>
+
+@if (showAddForm)
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Add New Employee</h5>
+        </div>
+        <div class="card-body">
+            <EditForm Model="newEmployee" OnValidSubmit="AddEmployee">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" />
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Email</label>
+                        <InputText class="form-control" @bind-Value="newEmployee.Email" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Password</label>
+                        <InputText type="password" class="form-control" @bind-Value="newEmployee.Password" />
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    @if (!string.IsNullOrEmpty(addMessage))
+                    {
+                        <div class="alert @(addSuccess ? "alert-success" : "alert-danger")">
+                            @addMessage
+                        </div>
+                    }
+                </div>
+
+                <button type="submit" class="btn btn-success me-2">Add Employee</button>
+                <button type="button" class="btn btn-secondary" @onclick="() => showAddForm = false">Cancel</button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@if (employees == null)
+{
+    <p>Loading employees...</p>
+}
+else if (!employees.Any())
+{
+    <p>No employees found.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Email Confirmed</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var employee in employees)
+                {
+                    <tr>
+                        <td>@employee.Email</td>
+                        <td>
+                            @if (employee.EmailConfirmed)
+                            {
+                                <span class="badge bg-success">✓ Confirmed</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning">⚠ Not Confirmed</span>
+                            }
+                        </td>
+                        <td>
+                            @if (employee.LockoutEnd == null || employee.LockoutEnd < DateTimeOffset.Now)
+                            {
+                                <span class="badge bg-success">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger">Locked</span>
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteEmployee(employee.Id)">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-3">
+        <strong>Total Employees:</strong> @employees.Count
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-success mt-3">@message</div>
+}
+
+@code {
+    private List<ApplicationUser>? employees;
+    private string? message;
+    private bool showAddForm = false;
+    private string? addMessage;
+    private bool addSuccess = false;
+    private NewEmployeeModel newEmployee = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployees();
+    }
+
+    private async Task LoadEmployees()
+    {
+        employees = (await UserManager.GetUsersInRoleAsync("ServiceProvider")).ToList();
+    }
+
+    private void ShowAddForm()
+    {
+        showAddForm = true;
+        addMessage = null;
+        newEmployee = new NewEmployeeModel();
+    }
+
+    private async Task AddEmployee()
+    {
+        addMessage = null;
+
+        if (string.IsNullOrWhiteSpace(newEmployee.Email) || string.IsNullOrWhiteSpace(newEmployee.Password))
+        {
+            addMessage = "Email and password are required.";
+            addSuccess = false;
+            return;
+        }
+
+        // Check if user already exists
+        var existingUser = await UserManager.FindByEmailAsync(newEmployee.Email);
+        if (existingUser != null)
+        {
+            addMessage = "An employee with this email already exists.";
+            addSuccess = false;
+            return;
+        }
+
+        // Create new employee
+        var employee = new ApplicationUser
+        {
+            UserName = newEmployee.Email,
+            Email = newEmployee.Email,
+            EmailConfirmed = true
+        };
+
+        var result = await UserManager.CreateAsync(employee, newEmployee.Password);
+
+        if (result.Succeeded)
+        {
+            // Add to ServiceProvider role
+            await UserManager.AddToRoleAsync(employee, "ServiceProvider");
+
+            addMessage = "Employee added successfully!";
+            addSuccess = true;
+
+            // Reload employees
+            await LoadEmployees();
+
+            // Reset form after 2 seconds
+            await Task.Delay(2000);
+            showAddForm = false;
+            addMessage = null;
+        }
+        else
+        {
+            addMessage = string.Join(", ", result.Errors.Select(e => e.Description));
+            addSuccess = false;
+        }
+    }
+
+    private async Task DeleteEmployee(string employeeId)
+    {
+        var employee = await UserManager.FindByIdAsync(employeeId);
+        if (employee == null)
+            return;
+
+        var result = await UserManager.DeleteAsync(employee);
+
+        if (result.Succeeded)
+        {
+            message = $"Employee {employee.Email} deleted successfully.";
+            await LoadEmployees();
+        }
+        else
+        {
+            message = "Failed to delete employee.";
+        }
+    }
+
+    private class NewEmployeeModel
+    {
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+}
