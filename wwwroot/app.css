@@ -33,3 +33,17 @@
         background-color: #e7a6a1;
         border: none;
     }
+
+.btn-primary {
+    background-color: #e7a6a1 !important;
+    border-color: #e7a6a1 !important;
+    color: white;
+}
+
+    .btn-primary:hover,
+    .btn-primary:focus {
+        background-color: #d98f8a !important;
+        border-color: #d98f8a !important;
+        color: white;
+    }
+
