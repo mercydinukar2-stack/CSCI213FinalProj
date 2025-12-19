@@ -1,18 +1,30 @@
 ﻿@page "/employee/appointments"
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = "ServiceProvider")]
+
 @using StudSpa.Models
 @using StudSpa.Data
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
+
 @inject ApplicationDbContext Db
 @inject UserManager<ApplicationUser> UserManager
 @inject AuthenticationStateProvider AuthStateProvider
 
 <h3>My Assigned Appointments</h3>
 <hr />
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-success">@message</div>
+}
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
 
 @if (appointments == null)
 {
@@ -24,26 +36,51 @@ else if (!appointments.Any())
 }
 else
 {
-    <table class="table table-striped">
+    <table class="table table-striped align-middle">
         <thead>
             <tr>
-                <th>Customer</th>
                 <th>Service</th>
                 <th>Date & Time</th>
                 <th>Status</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var appt in appointments)
             {
                 <tr>
-                    <td>@appt.CustomerId</td>
                     <td>@appt.Service.Name</td>
                     <td>@appt.AppointmentDate.ToString("g")</td>
                     <td>
                         <span class="badge @GetStatusBadge(appt.Status)">
                             @appt.Status
                         </span>
+                    </td>
+                    <td>
+                        @if (appt.Status == AppointmentStatus.Scheduled)
+                        {
+                            <button class="btn btn-sm btn-success me-1"
+                                    @onclick="() => UpdateStatus(appt.Id, AppointmentStatus.Confirmed)">
+                                Confirm
+                            </button>
+                        }
+
+                        @if (appt.Status == AppointmentStatus.Confirmed)
+                        {
+                            <button class="btn btn-sm btn-primary me-1"
+                                    @onclick="() => UpdateStatus(appt.Id, AppointmentStatus.Completed)">
+                                Complete
+                            </button>
+                        }
+
+                        @if (appt.Status != AppointmentStatus.Completed &&
+                                        appt.Status != AppointmentStatus.Cancelled)
+                        {
+                            <button class="btn btn-sm btn-danger"
+                                    @onclick="() => UpdateStatus(appt.Id, AppointmentStatus.Cancelled)">
+                                Cancel
+                            </button>
+                        }
                     </td>
                 </tr>
             }
@@ -53,6 +90,8 @@ else
 
 @code {
     private List<Appointment>? appointments;
+    private string? message;
+    private string? error;
 
     protected override async Task OnInitializedAsync()
     {
@@ -72,6 +111,38 @@ else
             .Where(a => a.EmployeeId == user.Id)
             .OrderBy(a => a.AppointmentDate)
             .ToListAsync();
+    }
+
+    private async Task UpdateStatus(int appointmentId, AppointmentStatus newStatus)
+    {
+        message = null;
+        error = null;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(authState.User);
+
+        if (user == null)
+        {
+            error = "User not found.";
+            return;
+        }
+
+        var appointment = await Db.Appointments
+            .FirstOrDefaultAsync(a =>
+                a.Id == appointmentId &&
+                a.EmployeeId == user.Id);
+
+        if (appointment == null)
+        {
+            error = "Appointment not found or not assigned to you.";
+            return;
+        }
+
+        appointment.Status = newStatus;
+        await Db.SaveChangesAsync();
+
+        message = $"Appointment marked as {newStatus}.";
+        await LoadAppointments();
     }
 
     private string GetStatusBadge(AppointmentStatus status) => status switch

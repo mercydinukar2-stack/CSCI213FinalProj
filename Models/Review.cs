@@ -47,5 +47,3 @@ namespace StudSpa.Models
         public Appointment Appointment { get; set; } = null!;
     }
 }
-
-

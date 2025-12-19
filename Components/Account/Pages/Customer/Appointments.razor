@@ -1,20 +1,30 @@
 ﻿@page "/customer/appointments"
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = "Customer")]
-@using System.Threading.Tasks
+
 @using StudSpa.Models
 @using StudSpa.Data
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
-@using Microsoft.AspNetCore.Components.Forms
 @inject ApplicationDbContext Db
 @inject UserManager<ApplicationUser> UserManager
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
 
 <h3>My Appointments</h3>
 <hr />
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-success">@message</div>
+}
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
 
 @if (appointments == null)
 {
@@ -50,7 +60,8 @@ else
                         @if (CanCancel(appt))
                         {
                             <button class="btn btn-sm btn-danger me-1"
-                                    @onclick="() => CancelAppointment(appt.Id)">
+                                    disabled="@isProcessing"
+                                    @onclick="() => ConfirmCancel(appt.Id)">
                                 Cancel
                             </button>
                         }
@@ -63,7 +74,6 @@ else
                             </NavLink>
                         }
                     </td>
-
                 </tr>
             }
         </tbody>
@@ -72,6 +82,9 @@ else
 
 @code {
     private List<Appointment>? appointments;
+    private string? message;
+    private string? error;
+    private bool isProcessing;
 
     protected override async Task OnInitializedAsync()
     {
@@ -100,13 +113,33 @@ else
              && appt.AppointmentDate > DateTime.Now;
     }
 
+    private async Task ConfirmCancel(int appointmentId)
+    {
+        message = null;
+        error = null;
+
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm", "Are you sure you want to cancel this appointment?");
+
+        if (!confirmed)
+            return;
+
+        await CancelAppointment(appointmentId);
+    }
+
     private async Task CancelAppointment(int appointmentId)
     {
+        isProcessing = true;
+
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = await UserManager.GetUserAsync(authState.User);
 
         if (user == null)
+        {
+            error = "User not found.";
+            isProcessing = false;
             return;
+        }
 
         var appointment = await Db.Appointments
             .FirstOrDefaultAsync(a =>
@@ -114,12 +147,26 @@ else
                 a.CustomerId == user.Id);
 
         if (appointment == null)
+        {
+            error = "Appointment not found.";
+            isProcessing = false;
             return;
+        }
+
+        if (!CanCancel(appointment))
+        {
+            error = "This appointment can no longer be cancelled.";
+            isProcessing = false;
+            return;
+        }
 
         appointment.Status = AppointmentStatus.Cancelled;
         await Db.SaveChangesAsync();
 
-        await LoadAppointments(); // refresh table
+        message = "Appointment cancelled successfully.";
+        isProcessing = false;
+
+        await LoadAppointments();
     }
 
     private string GetStatusBadge(AppointmentStatus status) => status switch
@@ -132,3 +179,4 @@ else
         _ => "bg-dark"
     };
 }
+

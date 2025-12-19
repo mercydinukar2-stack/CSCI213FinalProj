@@ -1,0 +1,191 @@
+﻿@page "/admin/services"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "SpaAdmin")]
+
+@using StudSpa.Models
+@using StudSpa.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Authorization
+@inject ApplicationDbContext Db
+
+<h3>Manage Services</h3>
+<hr />
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-success">@message</div>
+}
+
+<button class="btn btn-success mb-3" @onclick="NewService">
+    + Add Service
+</button>
+
+@if (services == null)
+{
+    <p>Loading services...</p>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Duration</th>
+                <th>Price</th>
+                <th>Active</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in services)
+            {
+                <tr>
+                    <td>@s.Name</td>
+                    <td>@s.DurationMinutes min</td>
+                    <td>$@s.Price</td>
+                    <td>
+                        <span class="badge @(s.IsActive ? "bg-success" : "bg-secondary")">
+                            @(s.IsActive ? "Active" : "Inactive")
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary me-1"
+                                @onclick="() => EditService(s)">
+                            Edit
+                        </button>
+
+                        <button class="btn btn-sm btn-danger"
+                                @onclick="() => ToggleActive(s)">
+                            @(s.IsActive ? "Disable" : "Enable")
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (editingService != null)
+{
+    <div class="card mt-4">
+        <div class="card-header">
+            <strong>@(editingService.Id == 0 ? "Add Service" : "Edit Service")</strong>
+        </div>
+        <div class="card-body">
+            <EditForm Model="editingService" OnValidSubmit="SaveService">
+                <DataAnnotationsValidator />
+
+                <div class="mb-3">
+                    <label class="form-label">Name</label>
+                    <InputText class="form-control"
+                               @bind-Value="editingService.Name" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <InputTextArea class="form-control"
+                                   @bind-Value="editingService.Description" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Duration (minutes)</label>
+                    <InputNumber class="form-control"
+                                 @bind-Value="editingService.DurationMinutes" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Price</label>
+                    <InputNumber class="form-control"
+                                 @bind-Value="editingService.Price" />
+                </div>
+
+                <button class="btn btn-primary me-2" type="submit">
+                    Save
+                </button>
+
+                <button class="btn btn-secondary" type="button"
+                        @onclick="CancelEdit">
+                    Cancel
+                </button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Service>? services;
+    private Service? editingService;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadServices();
+    }
+
+    private async Task LoadServices()
+    {
+        services = await Db.Services
+            .OrderBy(s => s.Name)
+            .ToListAsync();
+    }
+
+    private void NewService()
+    {
+        editingService = new Service
+        {
+            IsActive = true
+        };
+    }
+
+    private void EditService(Service service)
+    {
+        editingService = new Service
+        {
+            Id = service.Id,
+            Name = service.Name,
+            Description = service.Description,
+            DurationMinutes = service.DurationMinutes,
+            Price = service.Price,
+            IsActive = service.IsActive
+        };
+    }
+
+    private async Task SaveService()
+    {
+        if (editingService == null)
+            return;
+
+        if (editingService.Id == 0)
+        {
+            Db.Services.Add(editingService);
+            message = "Service added successfully.";
+        }
+        else
+        {
+            Db.Services.Update(editingService);
+            message = "Service updated successfully.";
+        }
+
+        await Db.SaveChangesAsync();
+        editingService = null;
+        await LoadServices();
+    }
+
+    private async Task ToggleActive(Service service)
+    {
+        service.IsActive = !service.IsActive;
+        await Db.SaveChangesAsync();
+
+        message = service.IsActive
+            ? "Service enabled."
+            : "Service disabled.";
+
+        await LoadServices();
+    }
+
+    private void CancelEdit()
+    {
+        editingService = null;
+    }
+}
+
